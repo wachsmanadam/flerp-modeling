@@ -1,9 +1,6 @@
-from typing import Dict
-
 import scipy.io
 import pandas as pd
 import numpy as np
-from dataclasses import dataclass
 
 path = r'C:\Users\stonefly\PycharmProjects\flerp-modeling\STD_TNO_FLREP_v1.1.0\Data\InputForClass\SmartEyeFeats_pp01_s1V2.mat'
 
@@ -35,7 +32,23 @@ class EEGInput:
         sample_meta_data_headers = np.concatenate(mat['infonames'].squeeze(), dtype = 'str')
         self.sample_metadata = pd.DataFrame(mat['sampleinfo'], columns = sample_meta_data_headers)
         self.data = mat['alldat']
+        # Separate power arrays from "raw" samples
+        self.alpha_power = np.vstack([self.data[i, :, -1] for i in np.arange(self.data.shape[0])])
+        self.theta_power = np.vstack([self.data[i, :, -2] for i in np.arange(self.data.shape[0])])
+        self.samples = np.stack([self.data[i, :, 0:-2] for i in np.arange(self.data.shape[0])], axis = 2)
         self.channel_labels = np.concatenate(mat['channel'].squeeze(), dtype= 'str')
+
+    def GetTargetStimulusIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['target?'] == 1]
+
+    def GetDistractorStimulusIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['target?'] == 0]
+
+    def GetHighLoadIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['mathtask?'] == 1]
+
+    def GetLowLoadIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['mathtask?'] == 0]
 
 ## Data Description
 #
