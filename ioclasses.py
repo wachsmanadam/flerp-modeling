@@ -12,8 +12,8 @@ path = r'C:\Users\stonefly\PycharmProjects\flerp-modeling\STD_TNO_FLREP_v1.1.0\D
 #
 # Each row represents block of 256 EEG samples starting from the point of highest eye saccade speed following stimulus
 # presentation
-# - begin: timestamp in ms
-# - end: timestamp in ms #TODO: why do they seem to all be 511ms in length? 256 at 256 Hz is 1 second and stimuli were presented for 1027ms
+# - begin: index of first EEG sample
+# - end: index of last EEG sample. Original sample rate was 512Hz, downsampled to 256Hz. Therefore end - begin always equals 511
 # - trial: trial block number
 # - saccadenr: order of saccades sampled in a given block
 # - stimulusnr: stimulus location revealed during the presentation
@@ -91,12 +91,3 @@ class EyeInput:
 
 # Time deltas from metadata
 # Create mask by labels
-
-
-
-
-test_class = EyeInput(path)
-
-metadf = test_class.sample_metadata
-
-print(metadf.head())

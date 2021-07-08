@@ -128,5 +128,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-#Dataset
-STD_TNO_FLERP_v1.1.0
+# Dataset
+STD_TNO_FLERP_v1.1.0/
+
+# ESS
+ESS/
+ESS-master.zip
+
