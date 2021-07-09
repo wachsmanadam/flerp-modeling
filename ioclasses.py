@@ -1,6 +1,7 @@
 import scipy.io
 import pandas as pd
 import numpy as np
+from functools import reduce
 
 path = r'C:\Users\stonefly\PycharmProjects\flerp-modeling\STD_TNO_FLREP_v1.1.0\Data\InputForClass\SmartEyeFeats_pp01_s1V2.mat'
 
@@ -35,7 +36,7 @@ class EEGInput:
         # Separate power arrays from "raw" samples
         self.alpha_power = np.vstack([self.data[i, :, -1] for i in np.arange(self.data.shape[0])])
         self.theta_power = np.vstack([self.data[i, :, -2] for i in np.arange(self.data.shape[0])])
-        self.samples = np.stack([self.data[i, :, 0:-2] for i in np.arange(self.data.shape[0])], axis = 2)
+        self.samples = np.stack([self.data[i, :, 0:-2] for i in np.arange(self.data.shape[0])], axis = 0)
         self.channel_labels = np.concatenate(mat['channel'].squeeze(), dtype= 'str')
 
     def GetTargetStimulusIndices(self):
@@ -49,6 +50,26 @@ class EEGInput:
 
     def GetLowLoadIndices(self):
         return self.sample_metadata.index[self.sample_metadata['mathtask?'] == 0]
+
+    def GetTargetIndicationIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['indicated?'] == 1]
+
+    def GetDistractorIndicationIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['indicated?'] == 0]
+
+    def GetHighLoadByAccuracy(self):
+        highload = self.sample_metadata[self.GetHighLoadIndices()]
+        correct_indices = highload.index[highload['indicated?'] == highload['target?']]
+
+        incorrect_indices = highload.index[highload['indicated?'] != highload['target?']]
+        return correct_indices, incorrect_indices
+
+    def GetLowLoadByAccuracy(self):
+        lowload = self.sample_metadata[self.GetLowLoadIndices()]
+        correct_indices = lowload.index[lowload['indicated?'] == lowload['target?']]
+
+        incorrect_indices = lowload.index[lowload['indicated?'] != lowload['target?']]
+        return correct_indices, incorrect_indices
 
 ## Data Description
 #
@@ -101,6 +122,37 @@ class EyeInput:
         self.delay = dat['delay']
         self.shift_index = dat['shiftindex'] # Unknown
 
+    def GetTargetStimulusIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['target?'] == 1]
+
+    def GetDistractorStimulusIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['target?'] == 0]
+
+    def GetHighLoadIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['math?'] == 1]
+
+    def GetLowLoadIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['math?'] == 0]
+
+    def GetTargetIndicationIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['indicated?'] == 1]
+
+    def GetDistractorIndicationIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['indicated?'] == 0]
+
+    def GetHighLoadByAccuracy(self):
+        highload = self.sample_metadata[self.GetHighLoadIndices()]
+        correct_indices = highload.index[highload['indicated?'] == highload['target?']]
+
+        incorrect_indices = highload.index[highload['indicated?'] != highload['target?']]
+        return correct_indices, incorrect_indices
+
+    def GetLowLoadByAccuracy(self):
+        lowload = self.sample_metadata[self.GetLowLoadIndices()]
+        correct_indices = lowload.index[lowload['indicated?'] == lowload['target?']]
+
+        incorrect_indices = lowload.index[lowload['indicated?'] != lowload['target?']]
+        return correct_indices, incorrect_indices
+
 
 # Time deltas from metadata
-# Create mask by labels
