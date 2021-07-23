@@ -124,11 +124,23 @@ class EEGInput(ABiosignalInputClass):
         # Separate power arrays from "raw" samples
         self.alpha_power = np.vstack([self.data[i, :, -1] for i in np.arange(self.data.shape[0])])
         self.theta_power = np.vstack([self.data[i, :, -2] for i in np.arange(self.data.shape[0])])
-        self.samples = np.stack([self.data[i, :, 0:-2] for i in np.arange(self.data.shape[0])], axis = 0)
+        self.samples = [pd.DataFrame(self.data[i, :, 0:-2]) for i in np.arange(self.data.shape[0])]
         self.channel_labels = np.concatenate(self.srcmat['channel'].squeeze(), dtype= 'str')
 
         self._terminate_srcmat()
 
+    def InterElectrodeCorrelations(self, trial_indices):
+        corr_arrays = []
+        for trial_idx in trial_indices:
+            trial_electrode_corr = self.samples[trial_idx].T.corr()
+            corr_array = []
+            for i in range(1,32):
+                corrs = trial_electrode_corr.loc[i-1, i:31]
+                corr_array.append(corrs)
+            corr_array = np.concatenate(corr_array)
+            corr_arrays.append(corr_array)
+
+        return corr_arrays
 
 ## Data Description
 #
