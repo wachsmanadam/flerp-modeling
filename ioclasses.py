@@ -1,4 +1,5 @@
 import scipy.io
+import scipy.stats as stats
 import pandas as pd
 import numpy as np
 from functools import reduce
@@ -36,19 +37,62 @@ class ABiosignalInputClass(object):
         return self.sample_metadata.index[self.sample_metadata['indicated?'] == 0]
 
     def GetHighLoadByAccuracy(self):
-        highload = self.sample_metadata[self.GetHighLoadIndices()]
+        highload = self.sample_metadata.iloc[self.GetHighLoadIndices()]
         correct_indices = highload.index[highload['correct'] == True]
 
         incorrect_indices = highload.index[highload['correct'] == False]
         return correct_indices, incorrect_indices
 
     def GetLowLoadByAccuracy(self):
-        lowload = self.sample_metadata[self.GetLowLoadIndices()]
+        lowload = self.sample_metadata.iloc[self.GetLowLoadIndices()]
         correct_indices = lowload.index[lowload['correct'] == True]
 
         incorrect_indices = lowload.index[lowload['correct'] == False]
         return correct_indices, incorrect_indices
 
+    def ChiSquareAccuracyBetweenConditions(self, targets_only = False):
+        """
+        Runs a Chi Square test on proportion of correct to incorrect answers between the low and high load conditions,
+        to determine if the high load condition proportion of correct and incorrect answers differs significantly from
+        the low load proportion. If the targets_only flag is set, this comparison is narrowed down to only presentation
+        of visual targets, excluding distractors.
+        :param targets_only:
+        :return:
+        """
+        ll_correct_index, ll_incorrect_index = self.GetLowLoadByAccuracy()
+        if not targets_only:
+            # Need proportion correct under low load
+            correct_proportion = ll_correct_index.shape[0] / (ll_correct_index.shape[0] + ll_incorrect_index.shape[0])
+
+            # Need total high_load to derive expected proportions
+            n_high_load = self.GetHighLoadIndices().shape[0]
+
+            expected_correct = round(correct_proportion*n_high_load)
+            expected_incorrect = n_high_load - expected_correct
+
+            # Get number of observations of correct/incorrect and calculate chi^2
+            hl_correct_index, hl_incorrect_index = self.GetHighLoadByAccuracy()
+            hl_n_correct, hl_n_incorrect = hl_correct_index.shape[0], hl_incorrect_index.shape[0]
+            chi_stat, p_value = stats.chisquare([hl_n_correct, hl_n_incorrect], f_exp=[expected_correct, expected_incorrect])
+            return chi_stat, p_value
+        if targets_only:
+            # Eliminate distractors trials using set intersection
+            ll_correct_target, ll_incorrect_target = np.intersect1d(ll_correct_index, self.GetTargetStimulusIndices()), \
+                                                     np.intersect1d(ll_incorrect_index, self.GetTargetStimulusIndices())
+            correct_proportion = ll_correct_target.shape[0] / (ll_correct_target.shape[0] + ll_incorrect_target.shape[0])
+
+            high_load_target = np.intersect1d(self.GetHighLoadIndices(), self.GetTargetStimulusIndices())
+            n_high_load_target = high_load_target.shape[0]
+
+            expected_correct = round(correct_proportion*n_high_load_target)
+            expected_incorrect = n_high_load_target-expected_correct
+
+            hl_correct_index, hl_incorrect_index = self.GetHighLoadByAccuracy()
+            hl_correct_target, hl_incorrect_target = np.intersect1d(hl_correct_index, self.GetTargetStimulusIndices()), \
+                                                     np.intersect1d(hl_incorrect_index, self.GetTargetStimulusIndices())
+            n_hl_correct_target, n_hl_incorrect_target = hl_correct_target.shape[0], hl_incorrect_target.shape[0]
+            chi_stat, p_value = stats.chisquare((n_hl_correct_target, n_hl_incorrect_target), f_exp=(expected_correct, expected_incorrect))
+            return chi_stat, p_value
 
 ## Data Description
 #
