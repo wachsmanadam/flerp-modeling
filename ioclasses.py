@@ -130,6 +130,11 @@ class EEGInput(ABiosignalInputClass):
         self._terminate_srcmat()
 
     def InterElectrodeCorrelations(self, trial_indices):
+        """
+
+        :param trial_indices:
+        :return: (1x496, 1x496 ndarray)
+        """
         corr_arrays = []
         for trial_idx in trial_indices:
             trial_electrode_corr = self.samples[trial_idx].T.corr()
@@ -140,7 +145,49 @@ class EEGInput(ABiosignalInputClass):
             corr_array = np.concatenate(corr_array)
             corr_arrays.append(corr_array)
 
-        return corr_arrays
+        cross_labels = []
+        for i in range(0, 32):
+            row_label = self.channel_labels[i]
+            column_labels = self.channel_labels[(i+1):32]
+
+            for column_label in column_labels:
+                cross_label = '-'.join([row_label, column_label])
+                cross_labels.append(cross_label)
+
+        return cross_labels, corr_arrays
+
+    def ElectrodeCorrelationsTargetVsDistractor(self, n_samples = 1000, random_seed = 11119):
+        rng = np.random.default_rng(random_seed)
+
+        target_trials, distractor_trials = self.GetTargetStimulusIndices(), self.GetDistractorStimulusIndices()
+
+        # Get correlations between target presentations and distractor presentations
+        correlation_labels, target_correlation_series = self.InterElectrodeCorrelations(target_trials)
+        correlation_labels, distractor_correlation_series = self.InterElectrodeCorrelations(distractor_trials)
+
+        # Stack so that axis 0 is the trial observation
+        target_correlation_series, distractor_correlation_series = np.vstack(target_correlation_series), np.vstack(distractor_correlation_series)
+
+        # Approximate all possible differences between all possible pairs of trials using random sampling
+        sampled_target = rng.choice(target_correlation_series, (n_samples,), replace = True, axis = 0)
+        sampled_distractor = rng.choice(distractor_correlation_series, (n_samples,), replace = True, axis = 0)
+
+        wilcoxon_stats, p_values = [], []
+        # Wilcoxon Signed Rank test per pair of channels. If there are stimulus-dependent changes in pairwise electrode
+        # correlation, they should be present in the form of p < 0.05 at the index positions for those pairs
+        # Null hypothesis: mean pairwise correlation between target and distractor trials is identical
+        # Alternative hypothesis: mean of pairwise correlation between target and distractor is significantly greater or less than each other
+        for i in range(sampled_target.shape[1]):
+            t_channel_samples, d_channel_samples = sampled_target[:, i], sampled_distractor[:, i]
+
+            statistic, p_value = stats.wilcoxon(t_channel_samples, d_channel_samples)
+            wilcoxon_stats.append(statistic)
+            p_values.append(p_value)
+
+        wilcoxon_stats, p_values = np.array(wilcoxon_stats), np.array(p_values)
+        return correlation_labels, wilcoxon_stats, p_values
+
+
 
 ## Data Description
 #
