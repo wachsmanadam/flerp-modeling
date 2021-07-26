@@ -2,6 +2,7 @@ import scipy.io
 import scipy.stats as stats
 import pandas as pd
 import numpy as np
+from copy import copy
 from functools import reduce
 
 path = r'C:\Users\stonefly\PycharmProjects\flerp-modeling\STD_TNO_FLREP_v1.1.0\Data\InputForClass\SmartEyeFeats_pp01_s1V2.mat'
@@ -16,7 +17,10 @@ class ABiosignalInputClass(object):
         self.sample_metadata = pd.DataFrame()
 
     def _terminate_srcmat(self):
-        del self.srcmat
+        try:
+            del self.srcmat
+        except NameError:
+            print('No srcmat attribute to delete')
 
     def GetTargetStimulusIndices(self):
         return self.sample_metadata.index[self.sample_metadata['target?'] == 1]
@@ -156,7 +160,7 @@ class EEGInput(ABiosignalInputClass):
 
         return cross_labels, corr_arrays
 
-    def ElectrodeCorrelationsTargetVsDistractor(self, n_samples = 1000, random_seed = 11119):
+    def ElectrodeCorrelationsTargetVsDistractor(self, n_samples = 1000, random_seed = 123):
         rng = np.random.default_rng(random_seed)
 
         target_trials, distractor_trials = self.GetTargetStimulusIndices(), self.GetDistractorStimulusIndices()
@@ -218,28 +222,151 @@ class EEGInput(ABiosignalInputClass):
 
 class EyeInput(ABiosignalInputClass):
 
-    def __init__(self, path:str):
+    def __init__(self, path:str, extra_paths = None):
         super().__init__(path)
 
-        self.xym = self.srcmat['xym'] # Currently unknown
-        self.indx = self.srcmat['indx'] # Unknown
-        self.xyq = self.srcmat['xyq'] # Unknown
+        if extra_paths is not None:
+            self._multi_init([path]+extra_paths)
+        else:
+            # Does not load properly with default params
+            self.srcmat = scipy.io.loadmat(path, simplify_cells = True)
 
-        dat = self.srcmat['dat']
-        self.fixation_feats = pd.DataFrame(dat['feats'], columns = dat['featlabel'])
-        pupil = dat['pupilsize']
-        if len(pupil.shape) < 2 or pupil.shape[1] != 3:
-            pupil = np.vstack(pupil)
-        self.pupil_size = pd.DataFrame(pupil, columns = dat['pupilsizelabel'])
-        self.sample_metadata = pd.DataFrame(dat['info'], columns = dat['infolabel'])
-        self.sample_metadata['correct'] = self.sample_metadata['indicated?'] == self.sample_metadata['target?']
+            self.xym = self.srcmat['xym'] # Currently unknown
+            self.indx = self.srcmat['indx'] # Unknown
+            self.xyq = self.srcmat['xyq'] # Unknown
 
-        self.trans_times = dat['transtimes'] # Unknown
-        self.stim_time = dat['stimtime'] # Unknown, relates to trans_times
-        self.delay = dat['delay']
-        self.shift_index = dat['shiftindex'] # Unknown
+            dat = self.srcmat['dat']
+            self.fixation_feats = pd.DataFrame(dat['feats'], columns = dat['featlabel'])
+            pupil = dat['pupilsize']
+            if len(pupil.shape) < 2 or pupil.shape[1] != 3:
+                pupil = np.vstack(pupil)
+            self.pupillometry = pd.DataFrame(pupil, columns = dat['pupilsizelabel'])
+            self.sample_metadata = pd.DataFrame(dat['info'], columns = dat['infolabel'])
+            self.sample_metadata['correct'] = self.sample_metadata['indicated?'] == self.sample_metadata['target?']
+
+            self.trans_times = dat['transtimes'] # Unknown
+            self.stim_time = dat['stimtime'] # Unknown, relates to trans_times
+            self.delay = dat['delay']
+            self.shift_index = dat['shiftindex'] # Unknown
+            self.is_multi = False
 
         self._terminate_srcmat()
+
+    def _multi_init(self, paths):
+        header = []
+        comment =[]
+
+        xym = []
+        indx = []
+        xyq = []
+        fixation_feats = []
+        pupillometry = []
+        sample_metadata = []
+        trans_times = []
+        stim_time = []
+        delay = []
+        shift_index = []
+        for i, path in enumerate(paths):
+            session_number = i+1
+
+            srcmat = scipy.io.loadmat(path, simplify_cells = True)
+
+            header.append(str(srcmat.get('__header__')))
+            comment.append(srcmat.get('comment'))
+
+            xym.append(srcmat['xym'])
+            indx.append(srcmat['indx'])
+            xyq.append(srcmat['xyq'])
+
+            dat = srcmat['dat']
+            fixation_feats.append(dat['feats'])
+
+            pupil = dat['pupilsize']
+            if len(pupil.shape) < 2 or pupil.shape[1] != 3:
+                pupil = np.vstack(pupil)
+            pupillometry.append(pupil)
+
+            meta = dat['info']
+            meta = np.insert(meta, 0, np.full(meta.shape[0], session_number), axis = 1) # Add column for session number
+            print(meta.shape)
+            sample_metadata.append(meta)
+            trans_times.append(dat['transtimes'])
+            stim_time.append(dat['stimtime'])
+            delay.append(dat['delay'])
+            shift_index.append(dat['shiftindex'])
+
+            metadata_labels = dat['infolabel']
+            feat_labels = dat['featlabel']
+            pupil_labels = dat['pupilsizelabel']
+
+        #TODO: Variables of unclear utility/relation to EEG data remain unmerged for now
+        self.header = header
+        self.comment = comment
+        self.xym = xym
+        self.index = indx
+        self.xyq = xyq
+        self.trans_times = trans_times
+        self.stim_time = stim_time
+        self.delay = delay
+        self.shift_index = shift_index
+
+        # Prepend to account for added session number values
+        pupil_df = pd.DataFrame(np.vstack(pupillometry), columns=pupil_labels)
+
+        self.pupillometry = pupil_df
+
+        metadata_labels = ['session']+list(metadata_labels)
+        meta_df = pd.DataFrame(np.vstack(sample_metadata), columns=metadata_labels)
+        meta_df['correct'] = meta_df['target?'] == meta_df['indicated?']  # Add response accuracy
+        self.sample_metadata = meta_df
+
+        fixation_df = pd.DataFrame(np.vstack(fixation_feats), columns = feat_labels)
+        self.fixation_feats = fixation_df
+
+        self.is_multi = True
+
+    def FilterByNumberOfValidGazes(self, cutoff:int = 60, ontarget_cutoff:int = None, ontarget_pupil_cutoff:int = None):
+        if ontarget_pupil_cutoff is not None:
+            output_indices = self.sample_metadata.index[self.sample_metadata['no_samples_ontargetANDpupvalid'] >= ontarget_pupil_cutoff]
+        elif ontarget_pupil_cutoff is not None:
+            output_indices = self.sample_metadata.index[self.sample_metadata['no_samples_ontarget'] >= ontarget_cutoff]
+        else:
+            output_indices = self.sample_metadata.index[self.sample_metadata['no_samples_in_timewindow'] >= cutoff]
+
+        return output_indices
+
+    def FixationFeatsTargetVsDistractor(self, n_valid_pupil = 5, n_samples = 1000, random_seed = 123):
+        rng = np.random.default_rng(random_seed)
+
+        # Filter out trials without pupil data
+        valid_indices = self.FilterByNumberOfValidGazes(ontarget_pupil_cutoff=n_valid_pupil)
+
+
+        target_indices = np.intersect1d(valid_indices, self.GetTargetStimulusIndices())
+        distractor_indices = np.intersect1d(valid_indices, self.GetDistractorStimulusIndices())
+
+        target_observations = self.fixation_feats.loc[target_indices, :]
+        distractor_observations = self.fixation_feats.loc[distractor_indices, :]
+
+        # Randomly sample rows of the fixation features
+        sampled_targets = rng.choice(target_observations, (n_samples,), replace = True, axis = 0)
+        sampled_distractors = rng.choice(distractor_observations, (n_samples,), replace = True, axis = 0)
+
+        col_names = target_observations.columns
+        # Select alt hypotheses for each column. I suspect that fixation will be longer, median pupil size will be larger,
+        # max pupil size will be larger (or not different), and deltat will be shorter for targets vs. distractors.
+        alt_hypotheses = {'fixation_duration': 'greater', 'median_pupilsize_ontarget': 'greater',
+                          'max_pupilsize_ontarget': 'greater', 'deltat': 'less'}
+        stats_results = {col: None for col in col_names}
+        # Perform Wilcoxon Signed-Rank on each column of observations to test if the differences between target feature
+        # measures and distractor feature measures differ by a statistically significant amount
+        for i, feature_name in enumerate(col_names):
+            target_feature, distractor_feature = sampled_targets[:,i], sampled_distractors[:, i]
+            result_tup = stats.wilcoxon(target_feature, distractor_feature, alternative=alt_hypotheses[feature_name])
+
+            stats_results[col_names[i]] = result_tup
+
+        return alt_hypotheses, stats_results
 
 
 # Time deltas from metadata
