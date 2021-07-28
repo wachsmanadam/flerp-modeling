@@ -133,6 +133,24 @@ class EEGInput(ABiosignalInputClass):
 
         self._terminate_srcmat()
 
+    # def _ReintroduceMissingRows(self):
+    #     TRIAL_BLOCK = set(range(1,16))
+    #
+    #     session_trial_grouping = self.sample_metadata.groupby(['session', 'trial'])
+    #     missing_data_trials = session_trial_grouping[session_trial_grouping['saccadenr'] < 15]
+    #     missing_data_indices = missing_data_trials.index
+    #
+    #     for session_num, trial_num in missing_data_indices:
+    #         session_filter = self.sample_metadata['session'] == session_num
+    #         trial_filter = self.sample_metadata['trial'] == trial_num
+    #         missing_trial = self.sample_metadata[session_filter & trial_filter]
+    #
+    #         missing_trial_numbers = TRIAL_BLOCK.difference(set(missing_trial['saccadenr']))
+    #
+    #         for missingno in missing_trial_numbers:
+    #             missing_row =
+
+
     def InterElectrodeCorrelations(self, trial_indices):
         """
 
@@ -288,7 +306,6 @@ class EyeInput(ABiosignalInputClass):
 
             meta = dat['info']
             meta = np.insert(meta, 0, np.full(meta.shape[0], session_number), axis = 1) # Add column for session number
-            print(meta.shape)
             sample_metadata.append(meta)
             trans_times.append(dat['transtimes'])
             stim_time.append(dat['stimtime'])
@@ -367,6 +384,3 @@ class EyeInput(ABiosignalInputClass):
             stats_results[col_names[i]] = result_tup
 
         return alt_hypotheses, stats_results
-
-
-# Time deltas from metadata

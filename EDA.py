@@ -11,7 +11,7 @@ EEGFILES = ["STD_TNO_FLREP_v1.1.0/Data/InputForClass/InputEEG_pp01_raw_fix_demea
             "STD_TNO_FLREP_v1.1.0/Data/InputForClass/InputEEG_pp06_raw_fix_demean.mat",
             "STD_TNO_FLREP_v1.1.0/Data/InputForClass/InputEEG_pp07_raw_fix_demean.mat",
             "STD_TNO_FLREP_v1.1.0/Data/InputForClass/InputEEG_pp08_raw_fix_demean.mat",
-            "STD_TNO_FLREP_v1.1.0/Data/InputForClass/InputEEG_pp09_raw_fix_demean.mat",
+            # "STD_TNO_FLREP_v1.1.0/Data/InputForClass/InputEEG_pp09_raw_fix_demean.mat", # Dropped due to more EEGs than eyes
             "STD_TNO_FLREP_v1.1.0/Data/InputForClass/InputEEG_pp10_raw_fix_demean.mat",
             "STD_TNO_FLREP_v1.1.0/Data/InputForClass/InputEEG_pp11_raw_fix_demean.mat",
             "STD_TNO_FLREP_v1.1.0/Data/InputForClass/InputEEG_pp12_raw_fix_demean.mat",
@@ -41,8 +41,8 @@ EYEFILES = [("STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp01_s1V2.ma
             "STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp07_s2V2.mat"),
             ("STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp08_s1V2.mat",
             "STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp08_s2V2.mat"),
-            ("STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp09_s1V2.mat",
-            "STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp09_s2V2.mat"),
+            # ("STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp09_s1V2.mat",
+            # "STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp09_s2V2.mat"),
             ("STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp10_s1V2.mat",
             "STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp10_s2V2.mat"),
             ("STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp11_s1V2.mat",
@@ -68,22 +68,43 @@ EYEFILES = [("STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp01_s1V2.ma
             "STD_TNO_FLREP_v1.1.0/Data/InputForClass/SmartEyeFeats_pp21_s2V2.mat")
             ]
 
-def TaskPerformanceReport(einput:EEGInput):
-    meta = einput.sample_metadata
-    session1_meta, session2_meta = meta[meta['session'] == 1], meta[meta['session'] == 2]
-    total_trial_blocks = np.max(session1_meta['trial']) + np.max(session2_meta['trial'])
+# Null hypothesis: load condition does not impact response accuracy
+# Cramer's V strength stat
 
+def TaskPerformanceReport(einput:EEGInput):
+    """
+    Calculates various metrics about behavioral task performance for a single subject EEGInput object
+    :param einput:
+    :return:
+    """
+    meta = einput.sample_metadata
+    total_trial_blocks = meta.shape[0]
+
+    # Subdivide by experimental task and separate by trials where presented stimuli were targets or distractors
     all_math, no_math = meta[meta['mathtask?'] == 1], meta[meta['mathtask?'] == 0]
+    total_math, total_no_math = all_math.shape[0], no_math.shape[0]
     all_math_target, all_math_distractor, no_math_target, no_math_distractor = all_math[all_math['target?'] == 1], \
                                                                                all_math[all_math['target?'] == 0], \
                                                                                no_math[no_math['target?'] == 1], \
                                                                                no_math[no_math['target?'] == 0]
-    correct_math, incorrect_math = np.sum(all_math_target['indicated?'] == 1) + np.sum(
-        all_math_distractor['indicated?'] == 0), np.sum(all_math_target['indicated?'] == 0) + np.sum(
-        all_math_distractor['indicated?'] == 1)
-    correct_no_math, incorrect_no_math = np.sum(no_math_target['indicated?'] == 1) + np.sum(
-        no_math_distractor['indicated?'] == 0), np.sum(no_math_target['indicated?'] == 0) + np.sum(
-        no_math_distractor['indicated?'] == 1)
+
+    # Separate by correct/incorrect answers for targets, and for distractors, still separated by task
+    correct_target_math, incorrect_target_math = all_math_target[all_math_target['indicated?'] == 1], all_math_target[all_math_target['indicated?'] == 0]
+    correct_target_no_math, incorrect_target_no_math = no_math_target[no_math_target['indicated?'] == 1], no_math_target[no_math_target['indicated?'] == 0]
+    correct_distractor_math, incorrect_distractor_math = all_math_distractor[all_math_distractor['indicated?'] == 0], all_math_distractor[all_math_distractor['indicated?'] == 1]
+    correct_distractor_no_math, incorrect_distractor_no_math = no_math_distractor[no_math_distractor['indicated?'] == 0], no_math_distractor[no_math_distractor['indicated?'] == 1]
+
+    # Get target accuracy by condition. Since already filtered by mismatches, calculate simply by n rows
+    target_accuracy_math = correct_target_math.shape[0] / (correct_target_math[0] + incorrect_target_math[0])
+    target_accuracy_no_math = correct_target_no_math.shape[0] / (correct_target_no_math.shape[0] + incorrect_target_no_math.shape[0])
+
+    # Aggregate correct and incorrect by task condition
+    correct_math, incorrect_math = np.sum(all_math_target['indicated?'] == 1) + np.sum(all_math_distractor['indicated?'] == 0), \
+                                   np.sum(all_math_target['indicated?'] == 0) + np.sum(all_math_distractor['indicated?'] == 1)
+    correct_no_math, incorrect_no_math = np.sum(no_math_target['indicated?'] == 1) + np.sum(no_math_distractor['indicated?'] == 0), \
+                                         np.sum(no_math_target['indicated?'] == 0) + np.sum(no_math_distractor['indicated?'] == 1)
+
+
 
     hl_accuracy, ll_accuracy = correct_math / (correct_math + incorrect_math), correct_no_math / (correct_no_math + incorrect_no_math)
 
@@ -98,26 +119,6 @@ def TaskPerformanceReport(einput:EEGInput):
     return total_trial_blocks, correct_math, incorrect_math, correct_no_math, incorrect_no_math, hl_accuracy, ll_accuracy
 
 
-def AggregatedElectrodeCorrelations(*eeginputs:EEGInput):
-    all_corr_btwn_subjects = []
-    high_corr_btwn_subjects = []
-    low_corr_btwn_subjects = []
-    for eeginput in eeginputs:
-        all_corr = [np.corrcoef(sample) for sample in eeginput.samples]
-        mean_all_corr = np.mean(all_corr, axis=0)
-
-        high_indices, low_indices = eeginput.GetHighLoadIndices(), eeginput.GetLowLoadIndices()
-        high_corr, low_corr = [np.corrcoef(sample) for sample in eeginput.samples[high_indices]], [np.corrcoef(sample)
-                                                                                                   for sample in
-                                                                                                   eeginput.samples[
-                                                                                                       low_indices]]
-        mean_high_corr, mean_low_corr = np.mean(high_corr, axis=0), np.mean(low_corr, axis=0)
-
-        all_corr_btwn_subjects.append(mean_all_corr)
-        high_corr_btwn_subjects.append(mean_high_corr)
-        low_corr_btwn_subjects.append(mean_low_corr)
-
-    return all_corr_btwn_subjects, high_corr_btwn_subjects, low_corr_btwn_subjects
 
 eye_list = []
 for session1, session2 in EYEFILES:
@@ -126,9 +127,9 @@ for session1, session2 in EYEFILES:
 for eye1, eye2 in eye_list:
     pass
 
-# eeginputs = []
-# for eegpath in EEGFILES:
-#     eeginputs.append(EEGInput(eegpath))
+eeginputs = []
+for eegpath in EEGFILES:
+    eeginputs.append(EEGInput(eegpath))
 
 # t_blocks, hl_acc, ll_acc = [], [], []
 # for einput in eeginputs:
@@ -142,22 +143,22 @@ for eye1, eye2 in eye_list:
 # print(f'Mean hl acc: {np.mean(hl_acc)}')
 # print(f'Mean ll acc: {np.mean(ll_acc)}')
 
-# agg_all_corr, agg_high_corr, agg_low_corr = AggregatedElectrodeCorrelations(*eeginputs)
-# electrode_labels = eeginputs[0].channel_labels
-#
-# for title, aggregation in zip(['Mean electrode correlation total', 'Mean electrode correlation: High Load', 'Mean electrode correlation: Low Load'], [agg_all_corr, agg_high_corr, agg_low_corr]):
-#     mean_agg = np.mean(aggregation, axis = 0)
-#
-#     plt.matshow(mean_agg, cmap = 'coolwarm')
-#     x_pos = np.arange(len(electrode_labels))
-#     plt.xticks(x_pos, electrode_labels, rotation = 40.0)
-#     plt.yticks(x_pos, electrode_labels)
-#     plt.title(title)
-#
-#     plt.show()
-#
-#
-#     input('Press enter to continue')
+agg_all_corr, agg_high_corr, agg_low_corr = AggregatedElectrodeCorrelations(*eeginputs)
+electrode_labels = eeginputs[0].channel_labels
+
+for title, aggregation in zip(['Mean electrode correlation total', 'Mean electrode correlation: High Load', 'Mean electrode correlation: Low Load'], [agg_all_corr, agg_high_corr, agg_low_corr]):
+    mean_agg = np.mean(aggregation, axis = 0)
+
+    plt.matshow(mean_agg, cmap = 'coolwarm')
+    x_pos = np.arange(len(electrode_labels))
+    plt.xticks(x_pos, electrode_labels, rotation = 40.0)
+    plt.yticks(x_pos, electrode_labels)
+    plt.title(title)
+
+    plt.show()
+
+
+    input('Press enter to continue')
 
 # total_alphas = []
 # total_thetas = []
