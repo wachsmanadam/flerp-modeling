@@ -2,14 +2,17 @@ import scipy.io
 import scipy.stats as stats
 import pandas as pd
 import numpy as np
-from copy import copy
-from functools import reduce
+import pickle
+
+import os
 
 path = r'C:\Users\stonefly\PycharmProjects\flerp-modeling\STD_TNO_FLREP_v1.1.0\Data\InputForClass\SmartEyeFeats_pp01_s1V2.mat'
 
 class ABiosignalInputClass(object):
 
     def __init__(self, path:str):
+        base_path, filename = os.path.split(path)
+        self.filename = filename
         self.srcmat = scipy.io.loadmat(path)
 
         self.header = str(self.srcmat['__header__'])
@@ -98,6 +101,17 @@ class ABiosignalInputClass(object):
             chi_stat, p_value = stats.chisquare((n_hl_correct_target, n_hl_incorrect_target), f_exp=(expected_correct, expected_incorrect))
             return chi_stat, p_value
 
+    def WriteAsPickle(self, out_path:str):
+        assert os.path.isdir(out_path), "Please check path and select an existing directory"
+        absolute = os.path.abspath(out_path)
+
+        write_path = os.path.join(absolute, f'{self.filename}.pickle')
+        with open(write_path, 'wb') as f:
+            pickle.dump(self, f)
+
+        print(f'Successfully wrote pickle to {absolute}')
+
+
 ## Data Description
 #
 # Each row represents block of 256 EEG samples starting from the point of highest eye saccade speed following stimulus
@@ -132,24 +146,6 @@ class EEGInput(ABiosignalInputClass):
         self.channel_labels = np.concatenate(self.srcmat['channel'].squeeze(), dtype= 'str')
 
         self._terminate_srcmat()
-
-    # def _ReintroduceMissingRows(self):
-    #     TRIAL_BLOCK = set(range(1,16))
-    #
-    #     session_trial_grouping = self.sample_metadata.groupby(['session', 'trial'])
-    #     missing_data_trials = session_trial_grouping[session_trial_grouping['saccadenr'] < 15]
-    #     missing_data_indices = missing_data_trials.index
-    #
-    #     for session_num, trial_num in missing_data_indices:
-    #         session_filter = self.sample_metadata['session'] == session_num
-    #         trial_filter = self.sample_metadata['trial'] == trial_num
-    #         missing_trial = self.sample_metadata[session_filter & trial_filter]
-    #
-    #         missing_trial_numbers = TRIAL_BLOCK.difference(set(missing_trial['saccadenr']))
-    #
-    #         for missingno in missing_trial_numbers:
-    #             missing_row =
-
 
     def InterElectrodeCorrelations(self, trial_indices):
         """
@@ -341,6 +337,12 @@ class EyeInput(ABiosignalInputClass):
         self.fixation_feats = fixation_df
 
         self.is_multi = True
+
+    def GetHighLoadIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['math?'] == 1]
+
+    def GetLowLoadIndices(self):
+        return self.sample_metadata.index[self.sample_metadata['math?'] == 0]
 
     def FilterByNumberOfValidGazes(self, cutoff:int = 60, ontarget_cutoff:int = None, ontarget_pupil_cutoff:int = None):
         if ontarget_pupil_cutoff is not None:
