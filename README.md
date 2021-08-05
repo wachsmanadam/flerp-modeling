@@ -20,6 +20,6 @@ When acquired, the specific files used are located under ```Additional Data/Inpu
 The main execution scripts are all contained in the ```scripts``` directory. Current order is ```PickleDatasets.py```, ```EDA.py```, and ```TrainValidateExportModels.py```.
 
 ## Additional description
-```ioclasses.py``` contains classes that convert and integrate the data from the source .mat files.
-```integrationclasses.py``` contains a class that integrates the types from above into a single dataset and contains methods to convert that data into scikit-learn classifier compatible arrays
-```modeltesters.py``` contain container classes for running hyperparameter search, training, validation, and testing pipeline using scikit-learn classifiers using the integrationclasses objects.
+- ```ioclasses.py``` contains classes that convert and integrate the data from the source .mat files.
+- ```integrationclasses.py``` contains a class that integrates the types from above into a single dataset and contains methods to convert that data into scikit-learn classifier compatible arrays
+- ```modeltesters.py``` contain container classes for running hyperparameter search, training, validation, and testing pipeline using scikit-learn classifiers using the integrationclasses objects.
