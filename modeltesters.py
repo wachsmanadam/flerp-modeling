@@ -5,6 +5,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.svm import LinearSVC
 from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 
 pd.set_option('display.max_columns', 32)
@@ -52,8 +54,8 @@ class AbstractModelTester:
 
         self.model.fit(self.X_train, self.y_train)
 
-    def ModelParameterSearch(self, gridsearch_dict, scoring):
-        cv = GridSearchCV(self.model, gridsearch_dict, scoring = scoring)
+    def ModelParameterSearch(self, paramgrid, scoring):
+        cv = GridSearchCV(self.model, paramgrid, scoring = scoring)
         cv.fit(self.X_train, self.y_train)
 
         return cv
@@ -78,10 +80,24 @@ class SVMTester(AbstractModelTester):
 
 class NaiveBayesTester(AbstractModelTester):
 
-    def __init__(self, inputframe):
+    def __init__(self, inputframe:pd.DataFrame):
         super().__init__(inputframe)
 
         self.model = GaussianNB()
+
+class LogRegTester(AbstractModelTester):
+
+    def __init__(self, inputframe:pd.DataFrame):
+        super().__init__(inputframe)
+
+        self.model = LogisticRegression()
+
+class RandomForestTester(AbstractModelTester):
+
+    def __init__(self, inputframe:pd.DataFrame):
+        super().__init__(inputframe)
+
+        self.model = RandomForestClassifier()
 
 
 if __name__ == "__main__":
@@ -94,9 +110,11 @@ if __name__ == "__main__":
 
     integ = IntegratedBiosignalClass(eye, eeg)
 
-    sv = NaiveBayesTester(integ.GetModelInput_a(True))
+    sv = RandomForestTester(integ.GetModelInput_a(True))
 
-    parameters = {}
+    parameters = [{'n_estimators': [1000], 'max_depth': [20], 'max_features': [0.01, 0.05, 0.1, 0.25, 0.5, 0.8, 1],
+                   'criterion': ['gini'], 'n_jobs': [2]}]
+    # {'criterion': 'gini', 'max_depth': 20, 'max_features': 0.25, 'n_estimators': 1000, 'n_jobs': 2}
     cross_validation_search = sv.ModelParameterSearch(parameters, scoring='accuracy')
 
     print(cross_validation_search.best_params_)

@@ -3,7 +3,11 @@ from integrationclasses import IntegratedBiosignalClass
 
 MODELS = [SVMTester, NaiveBayesTester]
 PARAM_GRIDS = {'LinearSVC': {'penalty': ['l1', 'l2'], 'loss': ['hinge', 'squared_hinge'], 'C': [0.1, 1.0, 10.0, 100.0]},
-               'GaussianNB': {}}
+               'GaussianNB': {},
+               'LogisticRegression': [{'C': [0.1, 1, 10, 100], 'penalty': ['l1'], 'solver': ['saga'], 'max_iter': [200]},
+                  {'C': [0.1, 1, 10, 100], 'penalty': ['l2'], 'solver': ['saga'], 'max_iter': [200]},
+                  {'C': [0.1, 1, 10, 100], 'penalty': ['elasticnet'], 'l1_ratio': [0.25, 0.5, 0.75], 'solver': ['saga'],
+                   'max_iter': [200]}]}
 
 import os
 import pickle
