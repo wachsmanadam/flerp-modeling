@@ -61,7 +61,19 @@ class IntegratedBiosignalClass:
     def GetDistractorIndices(self):
         return self.merged_metadata.index[self.merged_metadata['target?'] == 0]
 
+    def GetHighLoadIndices(self):
+        return self.merged_metadata.index[self.merged_metadata['math?'] == 1]
+
+    def GetLowLoadIndices(self):
+        return self.merged_metadata.index[self.merged_metadata['math?'] == 0]
+
     def GetModelInput_a(self, downsample_distractors:bool, random_seed = 1234):
+        """
+        Arranges data, subdivided by stimulus type alone.
+        :param downsample_distractors:
+        :param random_seed:
+        :return:
+        """
         TargetIndices, DistractorIndices = self.GetTargetIndices(), self.GetDistractorIndices()
 
         if downsample_distractors:
@@ -89,6 +101,53 @@ class IntegratedBiosignalClass:
 
         inputframe = pd.DataFrame(Targets, columns= Labels)
         return inputframe
+
+    def GetModelInput_b(self, condition:str, downsample_distractors:bool, random_seed = 1234):
+        """
+        Arranges data into a dataframe subdivided by cognitive load condition and stimulus type
+        :param condition:
+        :param downsample_distractors:
+        :param random_seed:
+        :return:
+        """
+        CONDITIONS = {'highload', 'lowload'}
+
+        assert condition in CONDITIONS, "Please submit either 'highload' or 'lowload' as condition string"
+
+        if condition == 'highload':
+            HighloadIndices = self.GetHighLoadIndices()
+            TargetIndices = np.intersect1d(HighloadIndices, self.GetTargetIndices())
+            DistractorIndices = np.intersect1d(HighloadIndices, self.GetDistractorIndices())
+        else:
+            LowloadIndices = self.GetLowLoadIndices()
+            TargetIndices = np.intersect1d(LowloadIndices, self.GetTargetIndices())
+            DistractorIndices = np.intersect1d(LowloadIndices, self.GetDistractorIndices())
+
+        if downsample_distractors:
+            rng = np.random.default_rng(random_seed)
+            DistractorIndices = rng.choice(DistractorIndices, replace = False, size=TargetIndices.shape)
+
+        Targets, Distractors = [], []
+        for index in TargetIndices:
+            Input = self._create_row_a(index, 1)
+            Targets.append(Input)
+        for index in DistractorIndices:
+            Input = self._create_row_a(index, 0)
+            Distractors.append(Input)
+
+        # Generate labels
+        Labels = []
+        Labels.extend([chan + '_sample' for chan in self.channel_labels])
+        Labels.extend([chan + '_alpha' for chan in self.channel_labels])
+        Labels.extend([chan + '_theta' for chan in self.channel_labels])
+        Labels.extend([col for col in self.fixation_features.columns])
+        Labels.append('target')
+
+        Targets.extend(Distractors)
+
+        inputframe = pd.DataFrame(Targets, columns=Labels)
+        return inputframe
+
 
     def _create_row_a(self, index:int, is_target:int):
         """

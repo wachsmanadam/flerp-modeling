@@ -116,14 +116,15 @@ class ABiosignalInputClass(object):
 #
 # Each row represents block of 256 EEG samples starting from the point of highest eye saccade speed following stimulus
 # presentation
+# sample_metadata:
 # - begin: index of first EEG sample
 # - end: index of last EEG sample. Original sample rate was 512Hz, downsampled to 256Hz. Therefore end - begin always equals 511
 # - trial: trial block number
 # - saccadenr: order of saccades sampled in a given block
 # - stimulusnr: stimulus location revealed during the presentation
 # - target?: indicates whether the revealed location was a target (1) or distractor (0)
-# - begintrial: timestamp of trial block's start, in ms
-# - endtrial: timestamp of trial block's end, in ms
+# - begintrial: index of trial block's start
+# - endtrial: index of trial block's end
 # - indicated?: whether the given stimulus was indicated as a recalled target (1) by the participant at the end of the block
 # - session: session number (participants had a break halfway through a run)
 # - mathtask?: whether the math/high load condition was present during a presentation
@@ -226,7 +227,7 @@ class EEGInput(ABiosignalInputClass):
 # - fixation_duration: total amount of time fixated on presented stimulus (seconds)
 # - median_pupilsize_ontarget: self-documented
 # - max_pupilsize_ontarget: self-documented
-# - deltat: time between presentation and first target fixation
+# - deltat: time between presentation and first target fixation (seconds)
 #
 # Raw eye-tracking data at 60Hz, where each row is a gaze recording
 # pupil_size:

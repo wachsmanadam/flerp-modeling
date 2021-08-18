@@ -1,19 +1,16 @@
-from modeltesters import SVMTester, NaiveBayesTester
+from modeltesters import SVMTester, NaiveBayesTester, LogRegTester, RandomForestTester
 from integrationclasses import IntegratedBiosignalClass
 
-MODELS = [SVMTester, NaiveBayesTester]
-PARAM_GRIDS = {'LinearSVC': {'penalty': ['l1', 'l2'], 'loss': ['hinge', 'squared_hinge'], 'C': [0.1, 1.0, 10.0, 100.0]},
+MODELS = [SVMTester, NaiveBayesTester, LogRegTester, RandomForestTester]
+# Note: Parameters below are result of the top 5 most accurate within-subject performances after a grid search
+PARAM_GRIDS = {'LinearSVC': {'penalty': ['l2'], 'loss': ['hinge'], 'C': [0.25], 'max_iter': [500]},
                'GaussianNB': {},
-               'LogisticRegression': [{'C': [0.1, 1, 10, 100], 'penalty': ['l1'], 'solver': ['saga'], 'max_iter': [200]},
-                  {'C': [0.1, 1, 10, 100], 'penalty': ['l2'], 'solver': ['saga'], 'max_iter': [200]},
-                  {'C': [0.1, 1, 10, 100], 'penalty': ['elasticnet'], 'l1_ratio': [0.25, 0.5, 0.75], 'solver': ['saga'],
-                   'max_iter': [200]}]}
+               'LogisticRegression': [{'C': [0.1], 'penalty': ['elasticnet'], 'l1_ratio': [0.25], 'solver': ['saga'], 'max_iter': [200]}],
+               'RandomForestClassifier': [{'n_estimators': [1000], 'max_depth': [20], 'max_features': [0.25],
+                   'criterion': ['gini'], 'n_jobs': [2]}]}
 
 import os
 import pickle
-
-import pandas as pd
-import numpy as np
 
 os.chdir('..')
 subject_folders = []
@@ -26,6 +23,7 @@ subject_results = {}
 for subject_path in subject_folders:
     subject_name = os.path.split(subject_path)[1]
 
+    # Get pickles
     for pickle_path in os.listdir(subject_path):
         if "InputEEG" in pickle_path:
             with open(os.path.join(subject_path, pickle_path), 'rb') as f:
@@ -51,6 +49,7 @@ for subject_path in subject_folders:
 
         result = {'test_metric': metrics, 'params': best_param_set}
         model_info[modelname] = result
+        print(f'{modelname} assessed')
 
 
     subject_results[subject_name] = model_info
